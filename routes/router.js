@@ -307,7 +307,7 @@ router.post('/userRegister', async (req, res) => {
                 to: email, // list of receivers
                 subject: "Test email verification", // Subject line
                 text: `Click this link to verify your email: http://localhost:7004/verify/${verificationToken}`,
-                html: `<b>Click this link to verify your email:<a href='http://localhost:7004/verify/${verificationToken}'>Link</a></b>`, // html body
+                html: `<b>Click this link to verify your email:<a href='https://shop-server2.onrender.com/verify/${verificationToken}'>Link</a></b>`, // html body
             });
             
             res.json({ user: true });
