@@ -1,4 +1,5 @@
 const express = require("express");
+const nodemailer = require("nodemailer");
 const router = new express.Router();
 const conn = require("../db/conn");
 const multer = require("multer");
@@ -41,9 +42,9 @@ function authenticateToken(req, res, next) {
     if (token == null) return res.sendStatus(401);
 
     jwt.verify(token, SECRET_KEY, (err, user) => {
-        
-    if (err) return res.sendStatus(403);
-  
+
+        if (err) return res.sendStatus(403);
+
         req.user = user;
 
         next();
@@ -253,24 +254,11 @@ router.get("/getCategoryName", (req, res) => {
     }
 });
 
-// post a user data 
-router.post('/createUser', (req, res) => {
-    const { name, email, password } = req.body;
 
-    const query = 'INSERT INTO users (name, email, password) VALUES (?, ?, ?)';
-    conn.query(query, [name, email, password], (err, results) => {
-        if (err) {
-            console.error(err);
-            res.status(500).json({ error: 'Error storing form data' });
-        } else {
-            res.json({ success: true });
-        }
-    });
-});
-
+// get all user
 router.get("/getAllUsers", (req, res) => {
     try {
-        conn.query("SELECT * FROM users", (err, result) => {
+        conn.query("SELECT * FROM usersT", (err, result) => {
             if (err) {
                 console.log("error")
             } else {
@@ -285,26 +273,43 @@ router.get("/getAllUsers", (req, res) => {
 
 
 
-
+// create a user
 router.post('/userRegister', async (req, res) => {
     const { name, email, password } = req.body;
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
     const id = uuidv4();
-
+    const verificationToken = uuidv4();
 
     // Store user information in database
-    const query = 'INSERT INTO usersT (id,name, email, password) VALUES (?, ?, ?, ?)'
-    conn.query(query, [id, name, email, passwordHash], (err, results) => {
+    const query = 'INSERT INTO usersT (id,name, email, password ,verification_token) VALUES (?, ?, ?, ?, ?)'
+    conn.query(query, [id, name, email, passwordHash, verificationToken], async (err, results) => {
         if (err) {
             console.error(err);
             res.status(500).json({ error: 'Error storing form data' });
         } else {
 
-            // Create a JWT for the authenticated user
-            // const token = jwt.sign({ email: email }, 'secretkey');
+            // create reusable transporter object using the default SMTP transport
+            let transporter = nodemailer.createTransport({
+                host: 'smtp-relay.sendinblue.com',
+                port: 587,
+                secure: false,
+                auth: {
 
-            // Send the JWT as the response
+                    user: 'mohid10587@gmail.com',
+                    pass: '7MOSEnf4UhFQrgsz'
+                }
+            });
+
+            // send mail with defined transport object
+            let info = await transporter.sendMail({
+                from: '"Fred Foo 👻" <foo@example.com>', // sender address
+                to: email, // list of receivers
+                subject: "Test email verification", // Subject line
+                text: `Click this link to verify your email: http://localhost:7004/verify/${verificationToken}`,
+                html: `<b>Click this link to verify your email:<a href='http://localhost:7004/verify/${verificationToken}'>Link</a></b>`, // html body
+            });
+            
             res.json({ user: true });
         }
     });
@@ -360,28 +365,29 @@ router.get('/me', authenticateToken, (req, res) => {
     // Retrieve user information from database
     const query = `SELECT * FROM usersT WHERE email='${email}'`;
     conn.query(query, (err, result) => {
-      if (err) throw err;
-      const user = result[0];
-      if (!user) {
-        return res.status(404).json({ message: 'User not found' });
-      }
-  
-      res.status(200).json({ email: user.email });
+        if (err) throw err;
+        const user = result[0];
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        res.status(200).json({ email: user.email });
     });
+});
+
+
+router.get("/verify/:verificationToken", async (req, res) => {
+    console.log('EMAIL')
+    try {
+      const { verificationToken } = req.params;
+      const query = `UPDATE usersT SET verified = true WHERE verification_token = '${verificationToken}'`
+       conn.query(query, [verificationToken]);
+      res.send("Email verified!");
+    } catch (error) {
+      console.error(error.message);
+      res.status(500).send("Server error");
+    }
   });
-  
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 // Route to update a user's password
